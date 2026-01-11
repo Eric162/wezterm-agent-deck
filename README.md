@@ -30,6 +30,204 @@ return config
 
 ## Configuration
 
+### Canonical "Inline" Setup (like OpenCode)
+
+If you want something that behaves like the inline setup we’ve been iterating on (scan every pane in the window, show one dot per pane in each tab, and avoid stale "working" when OpenCode has finished), you can drop this into your `~/.config/wezterm/wezterm.lua`.
+
+This approach does **not** rely on the plugin loader and is useful while developing locally.
+
+```lua
+local wezterm = require 'wezterm'
+
+local config = wezterm.config_builder()
+
+-- Tune responsiveness
+config.status_update_interval = 500
+
+local agent_colors = {
+  working = '#A6E22E',
+  waiting = '#E6DB74',
+  idle = '#66D9EF',
+  inactive = '#888888',
+}
+
+local agent_icons = {
+  working = '●',
+  waiting = '◐',
+  idle = '○',
+  inactive = '◌',
+}
+
+local agent_states = {}
+local opencode_activity = {}
+local prev_agent_states = {}
+
+local function bump_refresh(window)
+  pcall(function()
+    local overrides = window:get_config_overrides() or {}
+    overrides.__agent_deck_refresh = (overrides.__agent_deck_refresh or 0) + 1
+    window:set_config_overrides(overrides)
+  end)
+end
+
+local function detect_opencode_status(pane_id, pane)
+  local status = 'idle'
+
+  local now_ms = (function()
+    local ok, t = pcall(function() return tonumber(wezterm.time.now()) end)
+    if ok and t then return math.floor(t * 1000) end
+    return os.time() * 1000
+  end)()
+
+  local ok, text = pcall(function() return pane:get_lines_as_text(150) end)
+  if not ok or not text or #text == 0 then
+    return status
+  end
+
+  local lines = {}
+  for line in text:gmatch('[^\n]+') do
+    table.insert(lines, line)
+  end
+
+  local tail_start = math.max(1, #lines - 10 + 1)
+  local tail_text = table.concat(lines, '\n', tail_start, #lines)
+  local tail_lower = tail_text:lower()
+
+  -- Track whether the OpenCode UI is actively changing; its animated blocks
+  -- update the viewport while the agent is working.
+  local entry = opencode_activity[pane_id]
+  if not entry then
+    opencode_activity[pane_id] = { last = tail_text, last_change_ms = now_ms }
+  elseif entry.last ~= tail_text then
+    entry.last = tail_text
+    entry.last_change_ms = now_ms
+  end
+
+  local waiting_patterns = {
+    'allow once', 'allow always', 'deny',
+    'esc to cancel', 'yes, allow',
+    '(y/n)', '[y/n]', '(Y/n)', '[Y/n]', '(y/N)', '[y/N]',
+    'proceed?', 'continue?',
+    'permission',
+  }
+
+  for _, pat in ipairs(waiting_patterns) do
+    if tail_lower:find(pat, 1, true) then
+      return 'waiting'
+    end
+  end
+
+  local working_patterns = {
+    'esc to interrupt',
+    'esc interrupt',
+    -- Common OpenCode spinner/block glyphs
+    '█', '■', '▮', '▪', '▰',
+  }
+
+  for _, pat in ipairs(working_patterns) do
+    if tail_lower:find(pat, 1, true) or tail_text:find(pat, 1, true) then
+      status = 'working'
+      break
+    end
+  end
+
+  -- If it looks "working" but the viewport hasn't changed recently,
+  -- treat it as idle (avoids stale "working" after completion).
+  if status == 'working' then
+    entry = opencode_activity[pane_id]
+    if not entry or (now_ms - entry.last_change_ms) > 2000 then
+      status = 'idle'
+    end
+  end
+
+  return status
+end
+
+local function update_pane_agent_state(pane)
+  local pane_id = pane:pane_id()
+
+  local ok, info = pcall(function() return pane:get_foreground_process_info() end)
+  local argv = ok and info and table.concat(info.argv or {}, ' '):lower() or ''
+  local exe = ok and info and (info.executable or ''):lower() or ''
+
+  local is_opencode = exe:find('opencode', 1, true) or argv:find('opencode', 1, true)
+  if not is_opencode then
+    agent_states[pane_id] = nil
+    opencode_activity[pane_id] = nil
+    return
+  end
+
+  agent_states[pane_id] = {
+    agent_type = 'opencode',
+    status = detect_opencode_status(pane_id, pane),
+  }
+end
+
+wezterm.on('update-status', function(window, pane)
+  for _, tab in ipairs(window:mux_window():tabs()) do
+    for _, p in ipairs(tab:panes()) do
+      update_pane_agent_state(p)
+    end
+  end
+
+  local state_changed = false
+  for pane_id, state in pairs(agent_states) do
+    local prev = prev_agent_states[pane_id]
+    if not prev or prev.status ~= state.status then
+      state_changed = true
+      break
+    end
+  end
+
+  prev_agent_states = {}
+  for pane_id, state in pairs(agent_states) do
+    prev_agent_states[pane_id] = { status = state.status }
+  end
+
+  if state_changed then
+    bump_refresh(window)
+  end
+end)
+
+wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
+  local title = tab.tab_title
+  if not title or #title == 0 then
+    local process = tab.active_pane.foreground_process_name or tab.active_pane.title or ''
+    title = process:gsub('(.*[/\\])(.*)', '%2')
+  end
+  if not title or #title == 0 then
+    title = 'Terminal'
+  end
+
+  local formatted = { { Text = ' ' } }
+  local dots = {}
+  for _, pane_info in ipairs(tab.panes or {}) do
+    local st = agent_states[pane_info.pane_id]
+    if st then
+      table.insert(dots, st)
+    end
+  end
+
+  for i, st in ipairs(dots) do
+    local color = agent_colors[st.status] or agent_colors.inactive
+    local icon = agent_icons[st.status] or agent_icons.inactive
+    table.insert(formatted, { Foreground = { Color = color } })
+    table.insert(formatted, { Text = icon })
+    if i < #dots then
+      -- Thin space between dots
+      table.insert(formatted, { Text = ' ' })
+    end
+  end
+
+  table.insert(formatted, { Foreground = 'Default' })
+  table.insert(formatted, { Text = string.format(' %d: %s ', tab.tab_index + 1, title) })
+
+  return wezterm.format(formatted)
+end)
+
+return config
+```
+
 ### Basic Configuration
 
 ```lua

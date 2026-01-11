@@ -9,7 +9,7 @@ local default_patterns = {
     -- Working patterns - agent is actively processing
     working = {
         'esc to interrupt',
-        '[' .. table.concat({'', '', '', '', '', '', '', '', '', ''}, '') .. ']',  -- Spinner chars
+        'esc interrupt',
         'thinking',
         'pondering',
         'processing',
@@ -18,6 +18,17 @@ local default_patterns = {
         'writing',
         'reading',
         'searching',
+        'delegating work',
+        'planning next steps',
+        'gathering context',
+        'searching the codebase',
+        'searching the web',
+        'making edits',
+        'running commands',
+        'gathering thoughts',
+        'considering next steps',
+        '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
+        '█', '■', '▮', '▪', '▰',
     },
     
     -- Waiting patterns - agent needs user input (higher priority than working)
@@ -228,9 +239,7 @@ function M.detect_status(pane, agent_type, config)
         end
     end
     
-    -- Default: if agent is detected but no clear status, assume working
-    -- (agent might be initializing or in an unknown state)
-    return 'working'
+    return 'idle'
 end
 
 --- Get default patterns (for reference/debugging)

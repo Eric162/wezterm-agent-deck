@@ -294,19 +294,26 @@ end
 local default_patterns = {
     working = {
         'esc to interrupt',
+        'esc interrupt',
         'thinking', 'pondering', 'processing', 'analyzing',
         'generating', 'writing', 'reading', 'searching',
+        'delegating work', 'planning next steps', 'gathering context',
+        'searching the codebase', 'searching the web', 'making edits',
+        'running commands', 'gathering thoughts', 'considering next steps',
+        '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
+        '█', '■', '▮', '▪', '▰',
     },
     waiting = {
         'esc to cancel', 'yes, allow once', 'yes, allow always',
+        'allow once', 'allow always', 'deny',
         'no, and tell', 'do you trust', 'run this command',
         'execute this', 'continue%?', 'proceed%?',
         '%(y/n%)', '%(Y/n%)', '%[y/n%]', '%[Y/n%]',
         '%(y/N%)', '%(Y/N%)', '%[y/N%]', '%[Y/N%]',
         'approve this plan', 'do you want to proceed',
-        'press enter to continue',
+        'press enter to continue', 'permission',
     },
-    idle = { '^>%s*$', '^> $', '^>$' },
+    idle = { '^>%s*$', '^> $', '^>$', 'ask anything' },
 }
 
 local function strip_ansi(text)
@@ -397,7 +404,7 @@ local function detect_status(pane, agent_type, config)
         end
     end
     
-    return 'working'
+    return 'idle'
 end
 
 --[[ ============================================
@@ -522,6 +529,42 @@ local function render_tab_title(agent_state, tab, tab_config)
         for _, item in ipairs(component_items) do
             table.insert(result, item)
         end
+    end
+    
+    table.insert(result, { Text = ' ' })
+    return result
+end
+
+local function render_tab_title_multi(all_pane_states, tab, tab_config)
+    local default_title = get_default_title(tab)
+    local result = { { Text = ' ' } }
+    
+    if tab_config.position == 'left' then
+        for i, pane_data in ipairs(all_pane_states) do
+            local status = pane_data.state.status or 'inactive'
+            local icon = get_status_icon(status)
+            local color = get_status_color(status)
+            table.insert(result, { Foreground = { Color = color } })
+            table.insert(result, { Text = icon })
+            if i < #all_pane_states then
+                table.insert(result, { Text = '' })
+            end
+        end
+        table.insert(result, { Attribute = { Intensity = 'Normal' } })
+        table.insert(result, { Text = ' ' .. default_title })
+    else
+        table.insert(result, { Text = default_title .. ' ' })
+        for i, pane_data in ipairs(all_pane_states) do
+            local status = pane_data.state.status or 'inactive'
+            local icon = get_status_icon(status)
+            local color = get_status_color(status)
+            table.insert(result, { Foreground = { Color = color } })
+            table.insert(result, { Text = icon })
+            if i < #all_pane_states then
+                table.insert(result, { Text = '' })
+            end
+        end
+        table.insert(result, { Attribute = { Intensity = 'Normal' } })
     end
     
     table.insert(result, { Text = ' ' })
@@ -719,18 +762,26 @@ function M.apply_to_config(config, opts)
     local plugin_config = get_config()
     config.status_update_interval = plugin_config.update_interval
     
-    -- Tab title formatting
     if plugin_config.tab_title.enabled then
         wezterm.on('format-tab-title', function(tab, tabs, panes, wezterm_config, hover, max_width)
-            local active_pane = tab.active_pane
-            local pane_id = active_pane.pane_id
-            local agent_state = get_agent_state(pane_id)
+            local active_pane_id = tab.active_pane.pane_id
+            local all_pane_states = {}
             
-            if not agent_state then
+            for _, pane_info in ipairs(tab.panes or {}) do
+                local p_state = get_agent_state(pane_info.pane_id)
+                if p_state then
+                    table.insert(all_pane_states, {
+                        state = p_state,
+                        is_active = (pane_info.pane_id == active_pane_id)
+                    })
+                end
+            end
+            
+            if #all_pane_states == 0 then
                 return nil
             end
             
-            return render_tab_title(agent_state, tab, plugin_config.tab_title)
+            return render_tab_title_multi(all_pane_states, tab, plugin_config.tab_title)
         end)
     end
     
