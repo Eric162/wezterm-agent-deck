@@ -4,6 +4,9 @@ A WezTerm plugin that monitors and displays the status of AI coding agents (Open
 
 Heavily inspired by https://github.com/asheshgoplani/agent-deck
 
+<img width="1252" height="874" alt="Screenshot 2026-01-12 at 1 01 00 PM" src="https://github.com/user-attachments/assets/9285f6d7-cd59-4035-81ce-9d3268948622" />
+
+
 ## Features
 
 - **Real-time Agent Monitoring**: Detects AI coding agents running in terminal panes
