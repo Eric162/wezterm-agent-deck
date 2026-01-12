@@ -28,11 +28,8 @@ local default_patterns = {
         'gathering thoughts',
         'considering next steps',
         -- Braille spinner characters
-        '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
         -- Block characters
-        '█', '■', '▮', '▪', '▰',
         -- Claude Code thinking characters
-        '·', '✻', '✽', '✶', '✳', '✢',
     },
     
     -- Waiting patterns - agent needs user input (higher priority than working)
@@ -220,13 +217,8 @@ function M.detect_status(pane, agent_type, config)
         end
 
         -- Check custom idle patterns
-        for _, pattern in ipairs(patterns.idle) do
-            local match_success, _ = pcall(function()
-                return trimmed:match(pattern)
-            end)
-            if match_success and trimmed:match(pattern) then
-                return 'idle'
-            end
+        if matches_any(trimmed, patterns.idle) then
+            return 'idle'
         end
     end
 

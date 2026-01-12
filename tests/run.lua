@@ -98,6 +98,47 @@ runner:test('status.detect_status prefers idle prompt over stale working', funct
     t.eq(status.detect_status(pane, 'opencode', cfg), 'idle')
 end)
 
+runner:test('status.detect_status treats opencode new session as idle', function()
+    local status = require('status')
+
+    local pane = {
+        get_lines_as_text = function()
+            return table.concat({
+                '█',
+                'opencode',
+                'Ask anything... "Fix broken tests"',
+            }, '\n')
+        end,
+        get_logical_lines_as_text = function()
+            return ''
+        end,
+    }
+
+    local cfg = { max_lines = 100, agents = { opencode = {} } }
+
+    t.eq(status.detect_status(pane, 'opencode', cfg), 'idle')
+end)
+
+runner:test('status.detect_status does not treat opencode logo blocks as working', function()
+    local status = require('status')
+
+    local pane = {
+        get_lines_as_text = function()
+            return table.concat({
+                '██████',
+                'opencode',
+            }, '\n')
+        end,
+        get_logical_lines_as_text = function()
+            return ''
+        end,
+    }
+
+    local cfg = { max_lines = 100, agents = { opencode = {} } }
+
+    t.eq(status.detect_status(pane, 'opencode', cfg), 'idle')
+end)
+
 runner:test('status.detect_status finds waiting in recent output', function()
     local status = require('status')
 

@@ -301,11 +301,8 @@ local default_patterns = {
         'searching the codebase', 'searching the web', 'making edits',
         'running commands', 'gathering thoughts', 'considering next steps',
         -- Braille spinner characters
-        '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
         -- Block characters
-        '█', '■', '▮', '▪', '▰',
         -- Claude Code thinking characters
-        '·', '✻', '✽', '✶', '✳', '✢',
     },
     waiting = {
         'esc to cancel', 'yes, allow once', 'yes, allow always',
@@ -317,7 +314,7 @@ local default_patterns = {
         'approve this plan', 'do you want to proceed',
         'press enter to continue', 'permission',
     },
-    idle = { '^>%s*$', '^> $', '^>$', 'ask anything' },
+    idle = { '^>%s*$', '^> $', '^>$' },
 }
 
 local function strip_ansi(text)
@@ -400,10 +397,8 @@ local function detect_status(pane, agent_type, config)
         end
 
         -- Check custom idle patterns
-        for _, pattern in ipairs(patterns.idle) do
-            if pcall(function() return trimmed:match(pattern) end) and trimmed:match(pattern) then
-                return 'idle'
-            end
+        if matches_any_status(trimmed, patterns.idle) then
+            return 'idle'
         end
     end
 
