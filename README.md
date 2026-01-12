@@ -422,6 +422,76 @@ local all_states = agent_deck.get_all_agent_states()
 -- Count agents by status
 local counts = agent_deck.count_agents_by_status()
 -- Returns: { working = 2, waiting = 1, idle = 0, inactive = 0 }
+
+-- Get icon/color for a status (uses your configured icons/colors)
+local icon = agent_deck.get_status_icon('working')  -- Returns '●'
+local color = agent_deck.get_status_color('waiting')  -- Returns configured color
+
+-- Manually update a pane's agent state (useful in custom handlers)
+local state = agent_deck.update_pane(pane)
+```
+
+### Composable Custom Rendering
+
+Disable built-in rendering and implement your own handlers while using the plugin's detection:
+
+```lua
+local agent_deck = wezterm.plugin.require('https://github.com/yourusername/wezterm-agent-deck')
+
+agent_deck.apply_to_config(config, {
+    -- Disable plugin's built-in rendering
+    tab_title = { enabled = false },
+    right_status = { enabled = false },
+
+    -- Your custom colors/icons still work via get_status_icon/color
+    colors = {
+        working = '#A6E22E',
+        waiting = '#E6DB74',
+        idle = '#66D9EF',
+        inactive = '#888888',
+    },
+})
+
+-- Custom tab title with git branch + agent status
+wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
+    local title = get_git_branch() or 'Terminal'
+
+    -- Use plugin's state and configured icons/colors
+    local formatted = {}
+    for _, pane_info in ipairs(tab.panes or {}) do
+        local state = agent_deck.get_agent_state(pane_info.pane_id)
+        if state then
+            table.insert(formatted, { Foreground = { Color = agent_deck.get_status_color(state.status) } })
+            table.insert(formatted, { Text = agent_deck.get_status_icon(state.status) })
+        end
+    end
+    table.insert(formatted, { Text = ' ' .. title .. ' ' })
+    return wezterm.format(formatted)
+end)
+
+-- Custom status bar with agent counts + date/time
+wezterm.on('update-status', function(window, pane)
+    -- Trigger detection for all panes
+    for _, tab in ipairs(window:mux_window():tabs()) do
+        for _, p in ipairs(tab:panes()) do
+            agent_deck.update_pane(p)
+        end
+    end
+
+    -- Use plugin's counts
+    local counts = agent_deck.count_agents_by_status()
+    local cfg = agent_deck.get_config()
+
+    local items = {}
+    if counts.waiting > 0 then
+        table.insert(items, { Foreground = { Color = cfg.colors.waiting } })
+        table.insert(items, { Text = counts.waiting .. ' waiting ' })
+    end
+    -- Add your custom elements (date/time, etc.)
+    table.insert(items, { Text = wezterm.strftime('%H:%M') })
+
+    window:set_right_status(wezterm.format(items))
+end)
 ```
 
 ## Troubleshooting
@@ -457,11 +527,15 @@ local counts = agent_deck.count_agents_by_status()
 ### Local Development
 
 1. Clone the repository
-2. Reference via file URL:
+2. Load directly via `dofile()` (recommended for active development):
+   ```lua
+   local agent_deck = dofile('/path/to/wezterm-agent-deck/plugin/init.lua')
+   ```
+   Or via file URL (requires restart to pick up changes):
    ```lua
    local agent_deck = wezterm.plugin.require('file:///path/to/wezterm-agent-deck')
    ```
-3. Update plugin after changes:
+3. If using file URL, update plugin after changes:
    ```lua
    -- In Debug Overlay (Ctrl+Shift+L):
    wezterm.plugin.update_all()
