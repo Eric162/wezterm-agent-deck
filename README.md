@@ -55,7 +55,7 @@ local agent_colors = {
 
 local agent_icons = {
   working = '●',
-  waiting = '◐',
+  waiting = '◔',
   idle = '○',
   inactive = '◌',
 }
@@ -342,7 +342,7 @@ agent_deck.apply_to_config(config, {
 | Status | Icon | Color | Description |
 |--------|------|-------|-------------|
 | **working** | `●` | Green | Agent is actively processing |
-| **waiting** | `◐` | Yellow | User input needed |
+| **waiting** | `◔` | Yellow | User input needed |
 | **idle** | `○` | Blue | Ready for input |
 | **inactive** | `○` | Gray | No agent detected |
 

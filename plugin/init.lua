@@ -837,5 +837,10 @@ M.get_all_agent_states = get_all_agent_states
 M.count_agents_by_status = count_agents_by_status
 M.get_config = get_config
 M.set_config = set_config
+M.get_status_color = get_status_color
+M.get_status_icon = get_status_icon
+M.update_pane = function(pane)
+    return update_agent_state(pane, get_config())
+end
 
 return M
