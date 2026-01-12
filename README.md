@@ -2,6 +2,8 @@
 
 A WezTerm plugin that monitors and displays the status of AI coding agents (OpenCode, Claude, etc.) running in terminal panes. It provides real-time status indicators in tab titles and the status bar, with notification support for when agents need user attention.
 
+Heavily inspired by https://github.com/asheshgoplani/agent-deck
+
 ## Features
 
 - **Real-time Agent Monitoring**: Detects AI coding agents running in terminal panes
