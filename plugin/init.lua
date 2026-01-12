@@ -300,8 +300,12 @@ local default_patterns = {
         'delegating work', 'planning next steps', 'gathering context',
         'searching the codebase', 'searching the web', 'making edits',
         'running commands', 'gathering thoughts', 'considering next steps',
+        -- Braille spinner characters
         '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
+        -- Block characters
         '█', '■', '▮', '▪', '▰',
+        -- Claude Code thinking characters
+        '·', '✻', '✽', '✶', '✳', '✢',
     },
     waiting = {
         'esc to cancel', 'yes, allow once', 'yes, allow always',
@@ -360,18 +364,17 @@ end
 
 local function detect_status(pane, agent_type, config)
     if not agent_type then return 'inactive' end
-    
+
     local success, text = pcall(function()
         return pane:get_lines_as_text(config.max_lines or 100)
     end)
-    
+
     if not success or not text or text == '' then
         return 'inactive'
     end
-    
+
     local clean_text = strip_ansi(text)
-    local recent_text = get_last_lines(clean_text, 30)
-    
+
     local agent_config = config.agents[agent_type]
     local patterns = default_patterns
     if agent_config and agent_config.status_patterns then
@@ -381,29 +384,42 @@ local function detect_status(pane, agent_type, config)
             idle = agent_config.status_patterns.idle or default_patterns.idle,
         }
     end
-    
-    if matches_any_status(recent_text, patterns.waiting) then
-        return 'waiting'
-    end
-    
-    if matches_any_status(recent_text, patterns.working) then
-        return 'working'
-    end
-    
-    -- Check for idle prompt
+
+    -- Check in priority order: idle > waiting > working
+    -- Idle check first - if prompt is ready, agent is idle regardless of scrollback
+    -- This prevents false "working" status when agent just started or finished
     local last_lines = get_last_lines(clean_text, 5)
+
     for line in last_lines:gmatch('[^\n]+') do
         local trimmed = line:match('^%s*(.-)%s*$') or ''
-        if trimmed == '>' or trimmed == '> ' then
+
+        -- Check for ">" prompt (Claude/OpenCode prompt starts with >)
+        -- Matches: ">", "> ", "> Try something...", etc.
+        if trimmed == '>' or trimmed:match('^>%s') then
             return 'idle'
         end
+
+        -- Check custom idle patterns
         for _, pattern in ipairs(patterns.idle) do
             if pcall(function() return trimmed:match(pattern) end) and trimmed:match(pattern) then
                 return 'idle'
             end
         end
     end
-    
+
+    -- Then check waiting (needs user attention) - use recent 30 lines
+    local recent_text = get_last_lines(clean_text, 30)
+    if matches_any_status(recent_text, patterns.waiting) then
+        return 'waiting'
+    end
+
+    -- Finally check working (only in last 10 lines to avoid stale matches)
+    local very_recent = get_last_lines(clean_text, 10)
+    if matches_any_status(very_recent, patterns.working) then
+        return 'working'
+    end
+
+    -- Default to idle
     return 'idle'
 end
 
