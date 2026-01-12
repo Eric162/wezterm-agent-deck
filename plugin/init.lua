@@ -113,22 +113,22 @@ local default_config = {
     icons = {
         style = 'unicode',
         unicode = {
-            working = '',
-            waiting = '',
-            idle = '',
-            inactive = '',
+            working = '●',
+            waiting = '◔',
+            idle = '○',
+            inactive = '◌',
         },
         nerd = {
-            working = '',
-            waiting = '',
-            idle = '',
-            inactive = '',
+            working = '',  -- nf-fa-circle
+            waiting = '',  -- nf-fa-adjust
+            idle = '',  -- nf-fa-circle_o
+            inactive = '',  -- nf-cod-circle_outline
         },
         emoji = {
-            working = '',
-            waiting = '',
-            idle = '',
-            inactive = '',
+            working = '🟢',
+            waiting = '🟡',
+            idle = '🔵',
+            inactive = '⚪',
         },
     },
     

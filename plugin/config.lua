@@ -64,22 +64,22 @@ local default_config = {
     icons = {
         style = 'unicode',  -- 'unicode', 'nerd', or 'emoji'
         unicode = {
-            working = '',
-            waiting = '',
-            idle = '',
-            inactive = '',
+            working = '●',
+            waiting = '◔',
+            idle = '○',
+            inactive = '◌',
         },
         nerd = {
             working = '',  -- nf-fa-circle
-            waiting = '',  -- nf-fa-circle_o
-            idle = '',  -- nf-fa-circle_thin
-            inactive = '',  -- nf-fa-circle_o
+            waiting = '',  -- nf-fa-adjust
+            idle = '',  -- nf-fa-circle_o
+            inactive = '',  -- nf-cod-circle_outline
         },
         emoji = {
-            working = '',
-            waiting = '',
-            idle = '',
-            inactive = '',
+            working = '🟢',
+            waiting = '🟡',
+            idle = '🔵',
+            inactive = '⚪',
         },
     },
     
