@@ -147,6 +147,62 @@ function M.detect_agent(pane, config)
         end
     end
     
+    -- Final fallback: check pane title (agents like Claude set their title via escape sequences)
+    if not agent_type then
+        local title_success, pane_title = pcall(function()
+            return pane:get_title()
+        end)
+        
+        if title_success and pane_title and pane_title ~= '' then
+            for agent_name, agent_config in pairs(config.agents) do
+                local patterns = agent_config.patterns or { agent_name }
+                
+                if matches_any_pattern(pane_title, patterns) then
+                    agent_type = agent_name
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Final fallback: check pane title (agents often set terminal title)
+    -- This catches cases where agent runs as child of shell/node
+    if not agent_type then
+        local title_success, pane_title = pcall(function()
+            return pane.title
+        end)
+        
+        if title_success and pane_title and pane_title ~= '' then
+            for agent_name, agent_config in pairs(config.agents) do
+                local patterns = agent_config.patterns or { agent_name }
+                
+                if matches_any_pattern(pane_title, patterns) then
+                    agent_type = agent_name
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Final fallback: check pane title (useful when agent sets terminal title)
+    -- This catches cases like "Claude Code v2.1.6" in the title
+    if not agent_type then
+        local title_success, pane_title = pcall(function()
+            return pane:get_title()
+        end)
+        
+        if title_success and pane_title and pane_title ~= '' then
+            for agent_name, agent_config in pairs(config.agents) do
+                local patterns = agent_config.patterns or { agent_name }
+                
+                if matches_any_pattern(pane_title, patterns) then
+                    agent_type = agent_name
+                    break
+                end
+            end
+        end
+    end
+    
     -- Update cache
     detection_cache[pane_id] = {
         agent_type = agent_type,

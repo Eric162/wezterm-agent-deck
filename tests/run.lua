@@ -76,6 +76,36 @@ runner:test('detector.detect_agent matches executable, argv, and children', func
     t.eq(detector.detect_agent(pane, cfg), 'claude')
 end)
 
+runner:test('detector.detect_agent falls back to pane title for Claude Code', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 2 end,
+        get_foreground_process_info = function()
+            return {
+                executable = '/bin/zsh',
+                argv = { 'zsh' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return '/bin/zsh'
+        end,
+        get_title = function()
+            return 'Claude Code v2.1.6'
+        end,
+    }
+
+    local cfg = {
+        agents = {
+            opencode = { patterns = { 'opencode' } },
+            claude = { patterns = { 'claude', 'claude%-code' } },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), 'claude')
+end)
+
 runner:test('status.detect_status prefers idle prompt over stale working', function()
     local status = require('status')
 

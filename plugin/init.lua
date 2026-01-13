@@ -283,6 +283,22 @@ local function detect_agent(pane, config)
         end
     end
     
+    -- Fallback to pane title (catches agents that set terminal title like "Claude Code v2.1.6")
+    if not agent_type then
+        local title_success, pane_title = pcall(function()
+            return pane:get_title()
+        end)
+        if title_success and pane_title then
+            for agent_name, agent_config in pairs(config.agents) do
+                local patterns = agent_config.patterns or { agent_name }
+                if matches_any_pattern(pane_title, patterns) then
+                    agent_type = agent_name
+                    break
+                end
+            end
+        end
+    end
+    
     detection_cache[pane_id] = { agent_type = agent_type, timestamp = now }
     return agent_type
 end
