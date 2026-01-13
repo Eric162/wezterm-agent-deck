@@ -662,28 +662,38 @@ local function notify_waiting(pane, agent_type, config)
         return
     end
     
-    local window = nil
-    pcall(function()
-        local tab = pane:tab()
-        if tab then window = tab:window() end
-    end)
+    local titles = {
+        opencode = 'OpenCode',
+        claude = 'Claude',
+        gemini = 'Gemini',
+        codex = 'Codex',
+        aider = 'Aider',
+    }
+    local title = (titles[agent_type] or agent_type) .. ' - Attention Needed'
+    local message = 'Needs your input'
+    local timeout_ms = config.notifications.timeout_ms or 4000
     
-    if window then
-        local titles = {
-            opencode = 'OpenCode',
-            claude = 'Claude',
-            gemini = 'Gemini',
-            codex = 'Codex',
-            aider = 'Aider',
-        }
-        local title = (titles[agent_type] or agent_type) .. ' - Attention Needed'
-        local message = 'Needs your input'
-        local timeout = config.notifications.timeout_ms or 4000
-        
-        pcall(function()
-            window:toast_notification(title, message, nil, timeout)
-        end)
+    -- Navigate from pane to GuiWindow: pane -> tab -> mux_window -> gui_window
+    local tab = pane:tab()
+    if not tab then
+        wezterm.log_warn('[agent-deck] notification failed: pane has no tab')
+        return
     end
+    
+    local mux_window = tab:window()
+    if not mux_window then
+        wezterm.log_warn('[agent-deck] notification failed: tab has no window')
+        return
+    end
+    
+    local gui_window = mux_window:gui_window()
+    if not gui_window then
+        wezterm.log_warn('[agent-deck] notification failed: mux_window has no gui_window (headless?)')
+        return
+    end
+    
+    gui_window:toast_notification(title, message, nil, timeout_ms)
+    wezterm.log_info('[agent-deck] notification sent: ' .. title)
 end
 
 --[[ ============================================
