@@ -311,14 +311,12 @@ local default_patterns = {
     working = {
         'esc to interrupt',
         'esc interrupt',
+        'ctrl%+c to interrupt',
         'thinking', 'pondering', 'processing', 'analyzing',
         'generating', 'writing', 'reading', 'searching',
         'delegating work', 'planning next steps', 'gathering context',
         'searching the codebase', 'searching the web', 'making edits',
         'running commands', 'gathering thoughts', 'considering next steps',
-        -- Braille spinner characters
-        -- Block characters
-        -- Claude Code thinking characters
     },
     waiting = {
         'esc to cancel', 'yes, allow once', 'yes, allow always',
@@ -328,7 +326,7 @@ local default_patterns = {
         '%(y/n%)', '%(Y/n%)', '%[y/n%]', '%[Y/n%]',
         '%(y/N%)', '%(Y/N%)', '%[y/N%]', '%[Y/N%]',
         'approve this plan', 'do you want to proceed',
-        'press enter to continue', 'permission',
+        'press enter to continue',
     },
     idle = { '^>%s*$', '^> $', '^>$' },
 }
@@ -398,16 +396,14 @@ local function detect_status(pane, agent_type, config)
         }
     end
 
-    -- Check in priority order: idle > waiting > working
-    -- Idle check first - if prompt is ready, agent is idle regardless of scrollback
-    -- This prevents false "working" status when agent just started or finished
+    -- Check in priority order: idle > working > waiting
     local last_lines = get_last_lines(clean_text, 5)
+    local last_line_empty = false
 
     for line in last_lines:gmatch('[^\n]+') do
         local trimmed = line:match('^%s*(.-)%s*$') or ''
 
         -- Check for ">" prompt (Claude/OpenCode prompt starts with >)
-        -- Matches: ">", "> ", "> Try something...", etc.
         if trimmed == '>' or trimmed:match('^>%s') then
             return 'idle'
         end
@@ -418,16 +414,31 @@ local function detect_status(pane, agent_type, config)
         end
     end
 
-    -- Then check waiting (needs user attention) - use recent 30 lines
-    local recent_text = get_last_lines(clean_text, 30)
-    if matches_any_status(recent_text, patterns.waiting) then
-        return 'waiting'
+    -- Check if last line is empty/whitespace (OpenCode idle state)
+    local lines = {}
+    for line in clean_text:gmatch('[^\n]+') do
+        table.insert(lines, line)
+    end
+    if #lines > 0 then
+        local last = lines[#lines]:match('^%s*(.-)%s*$') or ''
+        last_line_empty = (last == '')
     end
 
-    -- Finally check working (only in last 10 lines to avoid stale matches)
+    -- Check working before waiting
     local very_recent = get_last_lines(clean_text, 10)
     if matches_any_status(very_recent, patterns.working) then
         return 'working'
+    end
+
+    -- If last line is empty and no working indicators, likely idle
+    if last_line_empty then
+        return 'idle'
+    end
+
+    -- Check waiting only in very recent lines (reduce false positives from scrollback)
+    local recent_text = get_last_lines(clean_text, 10)
+    if matches_any_status(recent_text, patterns.waiting) then
+        return 'waiting'
     end
 
     -- Default to idle
