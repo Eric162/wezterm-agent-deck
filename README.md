@@ -1,6 +1,6 @@
 # WezTerm Agent Deck
 
-[![Tests](https://github.com/eshirley/wezterm-agent-deck/actions/workflows/test.yml/badge.svg)](https://github.com/eshirley/wezterm-agent-deck/actions/workflows/test.yml)
+[![Tests](https://github.com/Eric162/wezterm-agent-deck/actions/workflows/test.yml/badge.svg)](https://github.com/Eric162/wezterm-agent-deck/actions/workflows/test.yml)
 
 Monitor AI coding agents (Claude Code, OpenCode, Aider, etc.) in WezTerm. Shows status dots in tabs and notifications when agents need attention.
 
