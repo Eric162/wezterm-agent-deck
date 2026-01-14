@@ -327,6 +327,10 @@ local default_patterns = {
         '%(y/N%)', '%(Y/N%)', '%[y/N%]', '%[Y/N%]',
         'approve this plan', 'do you want to proceed',
         'press enter to continue',
+        -- Plan mode ask tool patterns (OpenCode v1.1.18+)
+        'enter confirm',           -- Confirmation hint in ask dialog footer
+        'esc dismiss',             -- Dismiss hint in ask dialog footer
+        'type your own answer',    -- Custom input option in ask dialogs
     },
     idle = { '^>%s*$', '^> $', '^>$' },
 }

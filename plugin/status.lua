@@ -57,6 +57,10 @@ local default_patterns = {
         -- Menu selection indicators
         '' .. ' Yes',  -- Nerd font arrow
         '' .. ' No',
+        -- Plan mode ask tool patterns (OpenCode v1.1.18+)
+        'enter confirm',
+        'esc dismiss',
+        'type your own answer',
     },
     
     -- Idle patterns - agent is ready for input

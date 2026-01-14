@@ -102,7 +102,7 @@ agent_deck.get_config()                  -- current config
 
 ## Supported Agents
 
-OpenCode, Claude Code, Gemini, Codex, Aider. Add custom agents:
+OpenCode (including Plan mode), Claude Code, Gemini, Codex, Aider. Add custom agents:
 
 ```lua
 agents = {

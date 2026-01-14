@@ -189,6 +189,30 @@ runner:test('status.detect_status finds waiting in recent output', function()
     t.eq(status.detect_status(pane, 'opencode', cfg), 'waiting')
 end)
 
+runner:test('status.detect_status detects plan mode ask tool as waiting', function()
+    local status = require('status')
+
+    local pane = {
+        get_lines_as_text = function()
+            return table.concat({
+                'Filter Type  Standalone  Confirm',
+                'The existing filters are all string arrays. For hasAttachments, what behavior should it have?',
+                '1. Boolean filter (Recommended)',
+                '2. Tri-state filter',
+                '3. Type your own answer',
+                '⇥ tab  ↕ select  enter confirm  esc dismiss',
+            }, '\n')
+        end,
+        get_logical_lines_as_text = function()
+            return ''
+        end,
+    }
+
+    local cfg = { max_lines = 100, agents = { opencode = {} } }
+
+    t.eq(status.detect_status(pane, 'opencode', cfg), 'waiting')
+end)
+
 runner:test('components render placeholders and badge counts', function()
     local config = require('config')
     local components = require('components')
