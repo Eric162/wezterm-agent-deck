@@ -136,6 +136,16 @@ local default_config = {
         enabled = true,
         on_waiting = true,
         timeout_ms = 4000,
+        -- Notification backend: 'native' (wezterm toast) or 'terminal-notifier' (macOS only, supports sound)
+        backend = 'native',
+        -- terminal-notifier specific options (only used when backend = 'terminal-notifier')
+        terminal_notifier = {
+            path = nil,
+            sound = 'default',
+            group = 'wezterm-agent-deck',
+            title = 'WezTerm Agent Deck',
+            activate = true,
+        },
     },
 }
 
@@ -661,23 +671,71 @@ end
 
 local MIN_NOTIFICATION_GAP_MS = 10000
 
+local function shell_escape(str)
+    if not str then return '' end
+    return "'" .. str:gsub("'", "'\\''") .. "'"
+end
+
+local function send_terminal_notifier(subtitle, message, config)
+    local tn_config = config.notifications.terminal_notifier or {}
+    local binary = tn_config.path or 'terminal-notifier'
+    local title = tn_config.title or 'WezTerm Agent Deck'
+    
+    local cmd = binary
+        .. ' -title ' .. shell_escape(title)
+        .. ' -subtitle ' .. shell_escape(subtitle)
+        .. ' -message ' .. shell_escape(message)
+    
+    if tn_config.sound then
+        cmd = cmd .. ' -sound ' .. shell_escape(tn_config.sound)
+    end
+    
+    if tn_config.group then
+        cmd = cmd .. ' -group ' .. shell_escape(tn_config.group)
+    end
+    
+    if tn_config.activate then
+        cmd = cmd .. ' -sender com.github.wez.wezterm'
+    end
+    
+    local handle = io.popen(cmd .. ' 2>&1', 'r')
+    if handle then
+        local result = handle:read('*a')
+        local success, _, code = handle:close()
+        if not success or code ~= 0 then
+            wezterm.log_warn('[agent-deck] terminal-notifier failed: ' .. (result or 'unknown error'))
+            return false
+        end
+        return true
+    end
+    return false
+end
+
 local function notify_waiting(pane, agent_type, config)
     if not config.notifications.enabled or not config.notifications.on_waiting then
         return
     end
     
-    local titles = {
+    local agent_names = {
         opencode = 'OpenCode',
         claude = 'Claude',
         gemini = 'Gemini',
         codex = 'Codex',
         aider = 'Aider',
     }
-    local title = (titles[agent_type] or agent_type) .. ' - Attention Needed'
+    local agent_name = agent_names[agent_type] or agent_type
+    local subtitle = agent_name .. ' - Attention Needed'
     local message = 'Needs your input'
     local timeout_ms = config.notifications.timeout_ms or 4000
+    local backend = config.notifications.backend or 'native'
     
-    -- Navigate from pane to GuiWindow: pane -> tab -> mux_window -> gui_window
+    if backend == 'terminal-notifier' then
+        if send_terminal_notifier(subtitle, message, config) then
+            wezterm.log_info('[agent-deck] terminal-notifier sent: ' .. subtitle)
+        end
+        return
+    end
+    
     local tab = pane:tab()
     if not tab then
         wezterm.log_warn('[agent-deck] notification failed: pane has no tab')
@@ -696,8 +754,8 @@ local function notify_waiting(pane, agent_type, config)
         return
     end
     
-    gui_window:toast_notification(title, message, nil, timeout_ms)
-    wezterm.log_info('[agent-deck] notification sent: ' .. title)
+    gui_window:toast_notification(subtitle, message, nil, timeout_ms)
+    wezterm.log_info('[agent-deck] notification sent: ' .. subtitle)
 end
 
 --[[ ============================================

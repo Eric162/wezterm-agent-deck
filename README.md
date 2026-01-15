@@ -42,6 +42,29 @@ agent_deck.apply_to_config(config, {
 })
 ```
 
+## Notifications with Sound (macOS)
+
+WezTerm's native notifications don't support sound. For sound notifications on macOS, use [terminal-notifier](https://github.com/julienXX/terminal-notifier):
+
+```bash
+brew install terminal-notifier
+```
+
+```lua
+agent_deck.apply_to_config(config, {
+    notifications = {
+        enabled = true,
+        on_waiting = true,
+        backend = 'terminal-notifier',  -- or 'native' (default)
+        terminal_notifier = {
+            sound = 'default',  -- or 'Ping', 'Glass', 'Funk', etc.
+            title = 'WezTerm Agent Deck',  -- notification title
+            activate = true,  -- focus WezTerm when notification clicked
+        },
+    },
+})
+```
+
 ## Custom Rendering
 
 Disable built-in display and use the plugin's detection in your own handlers:

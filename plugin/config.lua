@@ -88,6 +88,14 @@ local default_config = {
         enabled = true,
         on_waiting = true,  -- Notify when agent needs input
         timeout_ms = 4000,
+        backend = 'native',  -- 'native' or 'terminal-notifier'
+        terminal_notifier = {
+            path = nil,
+            sound = 'default',
+            group = 'wezterm-agent-deck',
+            title = 'WezTerm Agent Deck',
+            activate = true,
+        },
     },
     
     -- Advanced options
@@ -202,6 +210,12 @@ function M.validate(config)
     if config.tab_title.position ~= 'left' and config.tab_title.position ~= 'right' then
         wezterm.log_warn('[agent-deck] tab_title.position should be "left" or "right", using "left"')
         config.tab_title.position = 'left'
+    end
+    
+    local valid_backends = { native = true, ['terminal-notifier'] = true }
+    if config.notifications.backend and not valid_backends[config.notifications.backend] then
+        wezterm.log_warn('[agent-deck] Invalid notification backend, using native')
+        config.notifications.backend = 'native'
     end
 end
 
