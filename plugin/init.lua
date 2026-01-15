@@ -76,10 +76,44 @@ local default_config = {
     update_interval = 5000,
     cooldown_ms = 2000,
     max_lines = 100,
+    enabled_agents = nil,
     
     agents = {
-        opencode = { patterns = { 'opencode' } },
-        claude = { patterns = { 'claude', 'claude%-code' } },
+        opencode = {
+            patterns = { 'opencode' },
+            executable_patterns = {
+                'opencode%-darwin',
+                'opencode%-linux',
+                'opencode%-win',
+                '%.opencode/bin/opencode',
+                '/opencode%-ai/',
+                '/opencode$',
+            },
+            argv_patterns = {
+                'bunx%s+opencode',
+                'npx%s+opencode',
+                '/opencode$',
+            },
+            title_patterns = { 'opencode' },
+        },
+        claude = {
+            patterns = { 'claude', 'claude%-code' },
+            executable_patterns = {
+                '@anthropic%-ai/claude%-code',
+                '/claude%-code/',
+                '/claude$',
+                '^claude%s*$',
+            },
+            argv_patterns = {
+                '@anthropic%-ai/claude%-code',
+                'claude%-code',
+                '^claude%s*$',
+            },
+            title_patterns = {
+                'claude code',
+                'claude',
+            },
+        },
         gemini = { patterns = { 'gemini' } },
         codex = { patterns = { 'codex' } },
         aider = { patterns = { 'aider' } },
@@ -223,18 +257,68 @@ local function matches_any_pattern(str, patterns)
     if not str or not patterns then return false end
     local str_lower = str:lower()
     for _, pattern in ipairs(patterns) do
-        if str_lower:find(pattern:lower()) then
-            return true
-        end
+        local success, result = pcall(function()
+            return str_lower:find(pattern:lower())
+        end)
+        if success and result then return true end
+        if not success and str_lower:find(pattern:lower(), 1, true) then return true end
     end
     return false
+end
+
+local function is_agent_enabled(agent_name, config)
+    if not config.enabled_agents then return true end
+    for _, enabled in ipairs(config.enabled_agents) do
+        if enabled == agent_name then return true end
+    end
+    return false
+end
+
+local function get_patterns_for_phase(agent_config, pattern_type, agent_name)
+    local specific_key = pattern_type .. '_patterns'
+    if agent_config[specific_key] and #agent_config[specific_key] > 0 then
+        return agent_config[specific_key]
+    end
+    if agent_config.patterns and #agent_config.patterns > 0 then
+        return agent_config.patterns
+    end
+    return { agent_name }
+end
+
+local function detect_from_process_info(executable, argv_str, config)
+    local exe_name = get_executable_name(executable)
+    for agent_name, agent_config in pairs(config.agents) do
+        if is_agent_enabled(agent_name, config) then
+            local exe_patterns = get_patterns_for_phase(agent_config, 'executable', agent_name)
+            if matches_any_pattern(executable, exe_patterns) or matches_any_pattern(exe_name, exe_patterns) then
+                return agent_name
+            end
+            local argv_patterns = get_patterns_for_phase(agent_config, 'argv', agent_name)
+            if matches_any_pattern(argv_str, argv_patterns) then
+                return agent_name
+            end
+        end
+    end
+    return nil
+end
+
+local function detect_from_title(pane_title, config)
+    if not pane_title or pane_title == '' then return nil end
+    for agent_name, agent_config in pairs(config.agents) do
+        if is_agent_enabled(agent_name, config) then
+            local title_patterns = get_patterns_for_phase(agent_config, 'title', agent_name)
+            if matches_any_pattern(pane_title, title_patterns) then
+                return agent_name
+            end
+        end
+    end
+    return nil
 end
 
 local function detect_agent(pane, config)
     local pane_id = pane:pane_id()
     local now = os.time() * 1000
     
-    -- Check cache
     local cached = detection_cache[pane_id]
     if cached and (now - cached.timestamp) < CACHE_TTL_MS then
         return cached.agent_type
@@ -242,69 +326,55 @@ local function detect_agent(pane, config)
     
     local agent_type = nil
     
-    -- Try process info
     local success, process_info = pcall(function()
         return pane:get_foreground_process_info()
     end)
     
     if success and process_info then
-        local exe_name = get_executable_name(process_info.executable or '')
+        local executable = process_info.executable or ''
+        local name = process_info.name or ''
         local argv_str = table.concat(process_info.argv or {}, ' ')
-        
-        for agent_name, agent_config in pairs(config.agents) do
-            local patterns = agent_config.patterns or { agent_name }
-            if matches_any_pattern(exe_name, patterns) or matches_any_pattern(argv_str, patterns) then
-                agent_type = agent_name
-                break
-            end
+        agent_type = detect_from_process_info(executable, argv_str, config)
+        if not agent_type and name ~= '' then
+            agent_type = detect_from_process_info(name, argv_str, config)
         end
         
-        -- Check children
         if not agent_type and process_info.children then
-            for _, child in ipairs(process_info.children) do
-                local child_exe = get_executable_name(child.executable or '')
+            for _, child in pairs(process_info.children) do
+                local child_exe = child.executable or ''
+                local child_name = child.name or ''
                 local child_argv = table.concat(child.argv or {}, ' ')
-                for agent_name, agent_config in pairs(config.agents) do
-                    local patterns = agent_config.patterns or { agent_name }
-                    if matches_any_pattern(child_exe, patterns) or matches_any_pattern(child_argv, patterns) then
-                        agent_type = agent_name
-                        break
-                    end
+                agent_type = detect_from_process_info(child_exe, child_argv, config)
+                if not agent_type and child_name ~= '' then
+                    agent_type = detect_from_process_info(child_name, child_argv, config)
                 end
                 if agent_type then break end
             end
         end
     end
     
-    -- Fallback to process name
     if not agent_type then
         local name_success, process_name = pcall(function()
             return pane:get_foreground_process_name()
         end)
         if name_success and process_name then
-            local exe_name = get_executable_name(process_name)
-            for agent_name, agent_config in pairs(config.agents) do
-                local patterns = agent_config.patterns or { agent_name }
-                if matches_any_pattern(exe_name, patterns) then
-                    agent_type = agent_name
-                    break
-                end
-            end
+            agent_type = detect_from_process_info(process_name, '', config)
         end
     end
     
-    -- Fallback to pane title (catches agents that set terminal title like "Claude Code v2.1.6")
     if not agent_type then
         local title_success, pane_title = pcall(function()
             return pane:get_title()
         end)
-        if title_success and pane_title then
-            for agent_name, agent_config in pairs(config.agents) do
-                local patterns = agent_config.patterns or { agent_name }
-                if matches_any_pattern(pane_title, patterns) then
-                    agent_type = agent_name
-                    break
-                end
+        if title_success then
+            agent_type = detect_from_title(pane_title, config)
+        end
+        if not agent_type then
+            local prop_success, prop_title = pcall(function()
+                return pane.title
+            end)
+            if prop_success and prop_title then
+                agent_type = detect_from_title(prop_title, config)
             end
         end
     end

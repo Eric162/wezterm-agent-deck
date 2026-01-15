@@ -76,6 +76,159 @@ runner:test('detector.detect_agent matches executable, argv, and children', func
     t.eq(detector.detect_agent(pane, cfg), 'claude')
 end)
 
+runner:test('detector.detect_agent uses executable_patterns for specific matching', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 3 end,
+        get_foreground_process_info = function()
+            return {
+                executable = '/Users/test/.bun/install/global/node_modules/opencode-darwin-arm64/bin/opencode',
+                argv = { 'opencode' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return 'opencode'
+        end,
+    }
+
+    local cfg = {
+        agents = {
+            opencode = {
+                patterns = { 'opencode' },
+                executable_patterns = { 'opencode%-darwin', 'opencode%-linux' },
+            },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), 'opencode')
+end)
+
+runner:test('detector.detect_agent respects enabled_agents whitelist', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 4 end,
+        get_foreground_process_info = function()
+            return {
+                executable = '/usr/bin/gemini',
+                argv = { 'gemini' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return 'gemini'
+        end,
+    }
+
+    local cfg = {
+        enabled_agents = { 'opencode', 'claude' },
+        agents = {
+            opencode = { patterns = { 'opencode' } },
+            claude = { patterns = { 'claude' } },
+            gemini = { patterns = { 'gemini' } },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), nil)
+
+    detector.clear_cache(4)
+    cfg.enabled_agents = nil
+    t.eq(detector.detect_agent(pane, cfg), 'gemini')
+end)
+
+runner:test('detector.detect_agent uses title_patterns for fallback', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 5 end,
+        get_foreground_process_info = function()
+            return {
+                executable = '/bin/zsh',
+                argv = { 'zsh' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return '/bin/zsh'
+        end,
+        get_title = function()
+            return 'Claude Code v2.1.6'
+        end,
+    }
+
+    local cfg = {
+        agents = {
+            claude = {
+                patterns = { 'claude' },
+                title_patterns = { 'claude%s+code%s+v' },
+            },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), 'claude')
+end)
+
+runner:test('detector.detect_agent matches bare claude executable with trailing spaces', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 6 end,
+        get_foreground_process_info = function()
+            return {
+                executable = 'claude  ',
+                argv = { 'claude' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return 'claude  '
+        end,
+    }
+
+    local cfg = {
+        agents = {
+            claude = {
+                patterns = { 'claude' },
+                executable_patterns = { '^claude%s*$' },
+            },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), 'claude')
+end)
+
+runner:test('detector.detect_agent uses process name field when executable is node', function()
+    local detector = require('detector')
+
+    local pane = {
+        pane_id = function() return 7 end,
+        get_foreground_process_info = function()
+            return {
+                executable = '/usr/local/bin/node',
+                name = 'claude',
+                argv = { 'node', '/path/to/cli.js' },
+                children = {},
+            }
+        end,
+        get_foreground_process_name = function()
+            return '/usr/local/bin/node'
+        end,
+    }
+
+    local cfg = {
+        agents = {
+            claude = {
+                patterns = { 'claude' },
+                executable_patterns = { '^claude%s*$' },
+            },
+        },
+    }
+
+    t.eq(detector.detect_agent(pane, cfg), 'claude')
+end)
+
 runner:test('detector.detect_agent falls back to pane title for Claude Code', function()
     local detector = require('detector')
 

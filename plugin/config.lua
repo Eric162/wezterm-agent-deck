@@ -8,14 +8,51 @@ local default_config = {
     -- Polling interval (ms) - default 5 seconds
     update_interval = 5000,
     
-    -- Agent detection via process name matching
+    -- Whitelist of agents to detect (nil = all agents enabled)
+    enabled_agents = nil,
+    
+    -- Agent detection via process/title pattern matching
+    -- Pattern types (checked in order of specificity):
+    --   executable_patterns: Match against full executable path or name
+    --   argv_patterns: Match against command line arguments
+    --   title_patterns: Match against pane/terminal title (fallback)
+    --   patterns: Generic fallback for all of the above
     agents = {
         opencode = {
             patterns = { 'opencode' },
-            status_patterns = nil,  -- Use defaults
+            executable_patterns = {
+                'opencode%-darwin',
+                'opencode%-linux',
+                'opencode%-win',
+                '%.opencode/bin/opencode',
+                '/opencode%-ai/',
+                '/opencode$',
+            },
+            argv_patterns = {
+                'bunx%s+opencode',
+                'npx%s+opencode',
+                '/opencode$',
+            },
+            title_patterns = { 'opencode' },
+            status_patterns = nil,
         },
         claude = {
             patterns = { 'claude', 'claude%-code' },
+            executable_patterns = {
+                '@anthropic%-ai/claude%-code',
+                '/claude%-code/',
+                '/claude$',
+                '^claude%s*$',
+            },
+            argv_patterns = {
+                '@anthropic%-ai/claude%-code',
+                'claude%-code',
+                '^claude%s*$',
+            },
+            title_patterns = {
+                'claude code',
+                'claude',
+            },
             status_patterns = nil,
         },
         gemini = {
