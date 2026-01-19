@@ -12,7 +12,7 @@ Inspired by [agent-deck](https://github.com/asheshgoplani/agent-deck).
 
 ```lua
 local wezterm = require('wezterm')
-local agent_deck = wezterm.plugin.require('https://github.com/eshirley/wezterm-agent-deck')
+local agent_deck = wezterm.plugin.require('https://github.com/Eric162/wezterm-agent-deck')
 local config = wezterm.config_builder()
 
 agent_deck.apply_to_config(config)
